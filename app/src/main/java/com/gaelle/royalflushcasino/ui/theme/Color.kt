@@ -2,10 +2,12 @@ package com.gaelle.royalflushcasino.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+// Palette casino
+val CasinoBlack = Color(0xFF121212)    // fond principal
+val CasinoSurface = Color(0xFF1E1E1E)  // cartes, barres
+val Gold = Color(0xFFD4AF37)           // or : boutons, titres
+val GoldLight = Color(0xFFF1D77A)      // or clair : effets, survol
+val FeltGreen = Color(0xFF0B5D3B)      // tapis de jeu
+val FeltGreenDark = Color(0xFF073D27)  // tapis foncé (bords, ombres)
+val CasinoRed = Color(0xFFB3202A)      // rouge : actions secondaires, pertes
+val Ivory = Color(0xFFF5F0E1)          // texte clair
