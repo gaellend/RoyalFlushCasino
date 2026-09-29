@@ -1,5 +1,8 @@
 package com.gaelle.royalflushcasino.data
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import android.util.Log
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -50,5 +53,14 @@ class DeckRepository {
     // Remélange toutes les cartes du paquet
     suspend fun reshuffle(deckId: String): DeckResponse {
         return client.get("$baseUrl/$deckId/shuffle/").body()
+    }
+
+    // Pioche "count" cartes en une requête, puis les émet une par une (effet de distribution)
+    fun dealCards(deckId: String, count: Int, delayMs: Long = 400): Flow<Card> = flow {
+        val cards = draw(deckId, count).cards
+        for (card in cards) {
+            emit(card)
+            delay(delayMs)
+        }
     }
 }
