@@ -5,25 +5,27 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
-import com.gaelle.royalflushcasino.data.Card
-import com.gaelle.royalflushcasino.data.DeckRepository
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
+import com.gaelle.royalflushcasino.navigation.BlackjackTable
+import com.gaelle.royalflushcasino.navigation.Hall
+import com.gaelle.royalflushcasino.navigation.History
+import com.gaelle.royalflushcasino.ui.screens.BlackjackScreen
+import com.gaelle.royalflushcasino.ui.screens.HallScreen
+import com.gaelle.royalflushcasino.ui.screens.HistoryScreen
+import com.gaelle.royalflushcasino.ui.theme.CasinoBlack
+import com.gaelle.royalflushcasino.ui.theme.Gold
 import com.gaelle.royalflushcasino.ui.theme.RoyalFlushCasinoTheme
 
 class MainActivity : ComponentActivity() {
@@ -35,44 +37,55 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             RoyalFlushCasinoTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    TestApi(modifier = Modifier.padding(innerPadding))
-                }
+                CasinoApp()
             }
         }
     }
 }
 
-// Test temporaire : vérifie que Ktor (API) et Coil (image) fonctionnent.
-// Sera supprimé quand on passera au ViewModel.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TestApi(modifier: Modifier = Modifier) {
-    val repo = remember { DeckRepository() }
-    var card by remember { mutableStateOf<Card?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
+fun CasinoApp() {
+    // La pile de navigation, avec le hall comme destination initiale
+    val backStack = remember { mutableStateListOf<Any>(Hall()) }
 
-    LaunchedEffect(Unit) {
-        try {
-            val deck = repo.newDeck()
-            card = repo.draw(deck.deckId, 1).cards.first()
-        } catch (e: Exception) {
-            error = e.message
-        }
+    // Le titre dépend de la destination en haut de la pile
+    val title = when (backStack.lastOrNull()) {
+        is Hall -> "Royal Flush Casino"
+        is BlackjackTable -> "Blackjack"
+        is History -> "Historique"
+        else -> ""
     }
 
-    Column(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        card?.let {
-            AsyncImage(
-                model = it.image,
-                contentDescription = "${it.value} of ${it.suit}",
-                modifier = Modifier.width(150.dp)
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(title) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = CasinoBlack,
+                    titleContentColor = Gold
+                )
             )
-            Text("${it.value} de ${it.suit}")
         }
-        error?.let { Text("Erreur : $it") }
+    ) { innerPadding ->
+        NavDisplay(
+            backStack = backStack,
+            modifier = Modifier.padding(innerPadding),
+            entryProvider = entryProvider {
+                entry<Hall> {
+                    HallScreen(
+                        onBlackjack = { backStack.add(BlackjackTable()) },
+                        onHistory = { backStack.add(History()) }
+                    )
+                }
+                entry<BlackjackTable> {
+                    BlackjackScreen(onBack = { backStack.removeLastOrNull() })
+                }
+                entry<History> {
+                    HistoryScreen(onBack = { backStack.removeLastOrNull() })
+                }
+            }
+        )
     }
 }
