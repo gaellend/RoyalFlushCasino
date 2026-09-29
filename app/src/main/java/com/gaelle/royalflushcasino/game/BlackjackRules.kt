@@ -11,14 +11,15 @@ enum class GamePhase {
     FINISHED      // main terminée, résultat affiché
 }
 
-// Les résultats possibles, avec le message à afficher
-enum class GameResult(val message: String) {
-    BLACKJACK("Blackjack ! Vous gagnez"),
-    WIN("Vous gagnez !"),
-    DEALER_BUST("Le croupier dépasse 21, vous gagnez !"),
-    PUSH("Égalité"),
-    LOSE("Le croupier gagne"),
-    BUST("Vous dépassez 21, perdu !")
+// Les résultats possibles : message à afficher et multiplicateur de la mise
+// (le multiplicateur inclut la mise récupérée : 2.0 = on récupère sa mise + autant de gain)
+enum class GameResult(val message: String, val payout: Double) {
+    BLACKJACK("Blackjack ! Vous gagnez", 2.5),
+    WIN("Vous gagnez !", 2.0),
+    DEALER_BUST("Le croupier dépasse 21, vous gagnez !", 2.0),
+    PUSH("Égalité", 1.0),
+    LOSE("Le croupier gagne", 0.0),
+    BUST("Vous dépassez 21, perdu !", 0.0)
 }
 
 // Valeur d'une carte (l'as compte 11 ici, on l'ajuste dans handValue)

@@ -13,21 +13,48 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
+const val STARTING_BALANCE = 1000
+
 class BlackjackViewModel : ViewModel() {
 
-    // États observés par l'interface
+    // États de la partie
     val playerCards = MutableStateFlow<List<Card>>(emptyList())
     val dealerCards = MutableStateFlow<List<Card>>(emptyList())
     val phase = MutableStateFlow(GamePhase.WAITING)
     val result = MutableStateFlow<GameResult?>(null)
-    val isBusy = MutableStateFlow(false) // comme onRoll dans le TP : une action est en cours
+    val isBusy = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
+
+    // États de l'argent
+    val balance = MutableStateFlow(STARTING_BALANCE) // jetons du joueur
+    val bet = MutableStateFlow(0)                     // mise en cours
+    val lastNet = MutableStateFlow<Int?>(null)        // gain ou perte de la dernière main
 
     private val repository = DeckRepository()
     private var deckId: String? = null
     private var cardsUsed = 0
 
-    // Récupère le paquet en cours, ou en crée un au premier appel
+    // On ne peut miser qu'entre deux mains
+    private fun canBet(): Boolean =
+        !isBusy.value && (phase.value == GamePhase.WAITING || phase.value == GamePhase.FINISHED)
+
+    fun addChip(value: Int) {
+        if (canBet() && bet.value + value <= balance.value) {
+            bet.value += value
+        }
+    }
+
+    fun clearBet() {
+        if (canBet()) bet.value = 0
+    }
+
+    // Recharge si le joueur n'a plus rien (remplacé plus tard par l'écran "Fauché")
+    fun refill() {
+        if (canBet() && balance.value == 0) {
+            balance.value = STARTING_BALANCE
+        }
+    }
+
     private suspend fun getDeckId(): String {
         deckId?.let { return it }
         val newId = repository.newDeck().deckId
@@ -36,19 +63,19 @@ class BlackjackViewModel : ViewModel() {
         return newId
     }
 
-    // Nouvelle main : 2 cartes au joueur, 2 au croupier, en alternance
     fun deal() {
-        if (isBusy.value) return
+        if (!canBet() || bet.value <= 0 || bet.value > balance.value) return
         viewModelScope.launch {
             isBusy.value = true
             error.value = null
             result.value = null
+            lastNet.value = null
             playerCards.value = emptyList()
             dealerCards.value = emptyList()
+            balance.value -= bet.value // la mise est posée sur la table
             phase.value = GamePhase.DEALING
             try {
                 val id = getDeckId()
-                // Sabot presque vide (6 jeux = 312 cartes) : on remélange
                 if (cardsUsed > 200) {
                     repository.reshuffle(id)
                     cardsUsed = 0
@@ -61,7 +88,6 @@ class BlackjackViewModel : ViewModel() {
                 }
                 cardsUsed += 4
 
-                // Un Blackjack d'entrée termine la main tout de suite
                 if (isBlackjack(playerCards.value) || isBlackjack(dealerCards.value)) {
                     finishRound()
                 } else {
@@ -69,6 +95,9 @@ class BlackjackViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 error.value = "Connexion au casino impossible. Vérifiez votre connexion."
+                balance.value += bet.value // on rend la mise
+                playerCards.value = emptyList()
+                dealerCards.value = emptyList()
                 phase.value = GamePhase.WAITING
             } finally {
                 isBusy.value = false
@@ -76,7 +105,6 @@ class BlackjackViewModel : ViewModel() {
         }
     }
 
-    // Le joueur tire une carte
     fun hit() {
         if (isBusy.value || phase.value != GamePhase.PLAYER_TURN) return
         viewModelScope.launch {
@@ -87,8 +115,8 @@ class BlackjackViewModel : ViewModel() {
                 cardsUsed++
                 playerCards.value = playerCards.value + card
                 val total = handValue(playerCards.value)
-                if (total > 21) finishRound()   // perdu
-                else if (total == 21) dealerPlay() // 21 : on reste automatiquement
+                if (total > 21) finishRound()
+                else if (total == 21) dealerPlay()
             } catch (e: Exception) {
                 error.value = "Connexion perdue, réessayez."
             } finally {
@@ -97,7 +125,6 @@ class BlackjackViewModel : ViewModel() {
         }
     }
 
-    // Le joueur reste : c'est au croupier
     fun stand() {
         if (isBusy.value || phase.value != GamePhase.PLAYER_TURN) return
         viewModelScope.launch {
@@ -114,7 +141,6 @@ class BlackjackViewModel : ViewModel() {
         }
     }
 
-    // Le croupier retourne sa carte puis tire tant qu'il a moins de 17
     private suspend fun dealerPlay() {
         phase.value = GamePhase.DEALER_TURN
         delay(600)
@@ -128,7 +154,13 @@ class BlackjackViewModel : ViewModel() {
     }
 
     private fun finishRound() {
-        result.value = computeResult(playerCards.value, dealerCards.value)
+        val r = computeResult(playerCards.value, dealerCards.value)
+        val payout = (bet.value * r.payout).toInt()
+        balance.value += payout
+        lastNet.value = payout - bet.value
+        result.value = r
         phase.value = GamePhase.FINISHED
+        // On garde la même mise pour la main suivante si le solde le permet
+        if (bet.value > balance.value) bet.value = balance.value
     }
 }
