@@ -43,6 +43,8 @@ class DeckRepository {
         }.body()
     }
 
+
+
     // Pioche "count" cartes dans le paquet
     suspend fun draw(deckId: String, count: Int = 1): DrawResponse {
         return client.get("$baseUrl/$deckId/draw/") {
@@ -56,10 +58,13 @@ class DeckRepository {
     }
 
     // Pioche "count" cartes en une requête, puis les émet une par une (effet de distribution)
-    fun dealCards(deckId: String, count: Int, delayMs: Long = 400): Flow<Card> = flow {
-        val cards = draw(deckId, count).cards
-        for (card in cards) {
-            emit(card)
+    // Pioche "count" cartes en une requête, puis les émet une par une
+    // avec le nombre de cartes restant dans le sabot (champ "remaining" de l'API)
+    fun dealCards(deckId: String, count: Int, delayMs: Long = 400): Flow<DrawnCard> = flow {
+        val response = draw(deckId, count)
+        response.cards.forEachIndexed { index, card ->
+            val remainingAfter = response.remaining + (response.cards.size - 1 - index)
+            emit(DrawnCard(card, remainingAfter))
             delay(delayMs)
         }
     }

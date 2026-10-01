@@ -4,22 +4,40 @@ import com.gaelle.royalflushcasino.data.Card
 
 // Les étapes d'une main
 enum class GamePhase {
-    WAITING,      // en attente de distribution
+    WAITING,      // en attente de mise et de distribution
     DEALING,      // distribution en cours
-    PLAYER_TURN,  // le joueur choisit : tirer ou rester
+    PLAYER_TURN,  // le joueur joue sa ou ses mains
     DEALER_TURN,  // le croupier joue
-    FINISHED      // main terminée, résultat affiché
+    FINISHED      // main terminée
 }
 
-// Les résultats possibles : message à afficher et multiplicateur de la mise
-// (le multiplicateur inclut la mise récupérée : 2.0 = on récupère sa mise + autant de gain)
-enum class GameResult(val message: String, val payout: Double) {
-    BLACKJACK("Blackjack ! Vous gagnez", 2.5),
-    WIN("Vous gagnez !", 2.0),
-    DEALER_BUST("Le croupier dépasse 21, vous gagnez !", 2.0),
-    PUSH("Égalité", 1.0),
-    LOSE("Le croupier gagne", 0.0),
-    BUST("Vous dépassez 21, perdu !", 0.0)
+// Résultat d'une main : phrase complète, version courte (sous une main séparée), multiplicateur
+enum class GameResult(val message: String, val short: String, val payout: Double) {
+    BLACKJACK("Blackjack !", "Blackjack", 2.5),
+    WIN("Vous gagnez !", "Gagné", 2.0),
+    DEALER_BUST("Le croupier dépasse 21 !", "Gagné", 2.0),
+    PUSH("Égalité", "Égalité", 1.0),
+    LOSE("Le croupier gagne", "Perdu", 0.0),
+    BUST("Vous dépassez 21", "Perdu", 0.0)
+}
+
+// Une main du joueur (2 après un split)
+data class PlayerHand(
+    val cards: List<Card> = emptyList(),
+    val bet: Int,
+    val fromSplit: Boolean = false, // main issue d'une séparation
+    val splitAces: Boolean = false, // As séparés : une seule carte chacun
+    val stood: Boolean = false,
+    val result: GameResult? = null
+) {
+    val value: Int get() = handValue(cards)
+    val isBust: Boolean get() = value > 21
+
+    // La main n'attend plus de décision : le joueur est resté, a dépassé 21 ou a 21
+    val isDone: Boolean get() = stood || value >= 21
+
+    // Blackjack "naturel" : seulement sur la main de départ, jamais après un split
+    val isNatural: Boolean get() = !fromSplit && isBlackjack(cards)
 }
 
 // Valeur d'une carte (l'as compte 11 ici, on l'ajuste dans handValue)
@@ -43,15 +61,26 @@ fun handValue(cards: List<Card>): Int {
 fun isBlackjack(cards: List<Card>): Boolean =
     cards.size == 2 && handValue(cards) == 21
 
-// Compare les deux mains et donne le résultat
-fun computeResult(player: List<Card>, dealer: List<Card>): GameResult {
-    val p = handValue(player)
+// Séparer : une seule fois, 2 cartes de même valeur, et assez de jetons pour la 2e mise
+fun canSplit(hands: List<PlayerHand>, balance: Int): Boolean {
+    if (hands.size != 1) return false
+    val hand = hands[0]
+    return hand.cards.size == 2 &&
+            !hand.isDone &&
+            hand.cards[0].points() == hand.cards[1].points() &&
+            balance >= hand.bet
+}
+
+// Compare une main du joueur à celle du croupier
+fun computeResult(hand: PlayerHand, dealer: List<Card>): GameResult {
+    val p = hand.value
     val d = handValue(dealer)
+    val dealerNatural = isBlackjack(dealer)
     return when {
         p > 21 -> GameResult.BUST
-        isBlackjack(player) && isBlackjack(dealer) -> GameResult.PUSH
-        isBlackjack(player) -> GameResult.BLACKJACK
-        isBlackjack(dealer) -> GameResult.LOSE
+        hand.isNatural && dealerNatural -> GameResult.PUSH
+        hand.isNatural -> GameResult.BLACKJACK
+        dealerNatural -> GameResult.LOSE
         d > 21 -> GameResult.DEALER_BUST
         p > d -> GameResult.WIN
         p < d -> GameResult.LOSE

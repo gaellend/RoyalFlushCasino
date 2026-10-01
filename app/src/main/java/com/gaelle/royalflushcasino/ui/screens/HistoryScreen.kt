@@ -1,16 +1,15 @@
 package com.gaelle.royalflushcasino.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.gaelle.royalflushcasino.ui.components.BackHeader
 
 @Composable
 fun HistoryScreen(
@@ -18,14 +17,18 @@ fun HistoryScreen(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier = modifier
+            .fillMaxSize()
+            .systemBarsPadding()
     ) {
-        Text("Aucune partie jouée pour l'instant")
-        Spacer(Modifier.height(24.dp))
-        OutlinedButton(onClick = onBack) {
-            Text("Retour au hall")
+        BackHeader(title = "Historique", onBack = onBack)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Aucune partie jouée pour l'instant")
         }
     }
 }

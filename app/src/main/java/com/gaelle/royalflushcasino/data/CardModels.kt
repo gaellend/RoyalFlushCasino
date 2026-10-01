@@ -29,3 +29,9 @@ data class Card(
     val value: String,  // "ACE", "2"... "10", "JACK", "QUEEN", "KING"
     val suit: String    // "HEARTS", "SPADES", "DIAMONDS", "CLUBS"
 )
+
+// Une carte piochée + le nombre de cartes restant dans le sabot à ce moment-là
+data class DrawnCard(
+    val card: Card,
+    val remaining: Int
+)
