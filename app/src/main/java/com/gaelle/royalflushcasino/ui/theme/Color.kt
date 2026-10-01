@@ -26,3 +26,7 @@ val ActionBlue = Color(0xFF3D7BD9)
 // Jetons (couleurs classiques de casino)
 val ChipBlue = Color(0xFF2F6FDB)    // 10
 val ChipPurple = Color(0xFF6B3FA0)  // 500
+
+val ActionOrange = Color(0xFFF2A33A)   // Doubler
+
+val ActionDark = Color(0xFF262A28)     // Abandonner

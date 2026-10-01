@@ -1,6 +1,5 @@
 package com.gaelle.royalflushcasino.viewmodel
 
-import com.gaelle.royalflushcasino.game.chipsFor
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,8 +8,12 @@ import coil3.request.ImageRequest
 import com.gaelle.royalflushcasino.data.Card
 import com.gaelle.royalflushcasino.data.DeckRepository
 import com.gaelle.royalflushcasino.game.GamePhase
+import com.gaelle.royalflushcasino.game.GameResult
 import com.gaelle.royalflushcasino.game.PlayerHand
+import com.gaelle.royalflushcasino.game.canDouble
 import com.gaelle.royalflushcasino.game.canSplit
+import com.gaelle.royalflushcasino.game.canSurrender
+import com.gaelle.royalflushcasino.game.chipsFor
 import com.gaelle.royalflushcasino.game.computeResult
 import com.gaelle.royalflushcasino.game.handValue
 import com.gaelle.royalflushcasino.game.isBlackjack
@@ -159,6 +162,7 @@ class BlackjackViewModel(application: Application) : AndroidViewModel(applicatio
                         index++
                     }
 
+                // Blackjack d'entrée (joueur ou croupier) : la main s'arrête tout de suite
                 if (isBlackjack(hands.value[0].cards) || isBlackjack(dealerCards.value)) {
                     finishRound()
                 } else {
@@ -191,6 +195,18 @@ class BlackjackViewModel(application: Application) : AndroidViewModel(applicatio
         nextHand()
     }
 
+    fun doubleDown() = playerAction {
+        val i = activeHand.value
+        val hand = hands.value[i]
+        if (!canDouble(hand, balance.value)) return@playerAction
+        val card = drawOne()      // on pioche d'abord : si le réseau coupe, rien n'est payé
+        balance.value -= hand.bet // puis on paie le doublement
+        updateHand(i) {
+            it.copy(cards = it.cards + card, bet = it.bet * 2, doubled = true, stood = true)
+        }
+        nextHand()
+    }
+
     fun split() = playerAction {
         val current = hands.value
         if (!canSplit(current, balance.value)) return@playerAction
@@ -219,6 +235,12 @@ class BlackjackViewModel(application: Application) : AndroidViewModel(applicatio
             updateHand(1) { it.copy(stood = true) }
         }
         if (hands.value[0].isDone) nextHand()
+    }
+
+    fun surrender() = playerAction {
+        if (!canSurrender(hands.value)) return@playerAction
+        updateHand(0) { it.copy(result = GameResult.SURRENDER) }
+        finishRound() // le croupier ne joue pas, il retourne juste sa carte
     }
 
     // Passe à la main suivante, ou au croupier si toutes les mains sont jouées

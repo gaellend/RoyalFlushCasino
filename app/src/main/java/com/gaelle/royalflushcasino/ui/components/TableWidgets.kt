@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gaelle.royalflushcasino.R
@@ -135,15 +136,19 @@ fun BackHeader(
 }
 
 // Bouton d'action rond avec icône et libellé (style Hit / Stand)
+// Bouton d'action rond avec une icône (ou un court texte comme "×2") et un libellé dessous
+// Bouton d'action rond avec une icône (ou un court texte comme "×2") et un libellé dessous
 @Composable
 fun ActionButton(
-    iconRes: Int,
     label: String,
     color: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    iconRes: Int? = null,
+    iconText: String? = null,
     enabled: Boolean = true,
-    iconTint: Color = Color.White
+    iconTint: Color = Color.White,
+    size: Dp = 64.dp
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -155,7 +160,7 @@ fun ActionButton(
     ) {
         Box(
             modifier = Modifier
-                .size(64.dp)
+                .size(size)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -171,15 +176,31 @@ fun ActionButton(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                painter = painterResource(iconRes),
-                contentDescription = label,
-                tint = iconTint,
-                modifier = Modifier.size(30.dp)
-            )
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = label,
+                    tint = iconTint,
+                    modifier = Modifier.size(size * 0.47f)
+                )
+            } else if (iconText != null) {
+                Text(
+                    text = iconText,
+                    color = iconTint,
+                    fontFamily = Montserrat,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (size.value * 0.33f).sp // ← taille du texte, proportionnelle au bouton
+                )
+            }
         }
         Spacer(Modifier.height(6.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, color = Ivory)
+        Text(
+            text = label,
+            // Petits boutons : libellé plus petit pour tenir sur une ligne
+            style = if (size < 64.dp) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+            color = Ivory,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
