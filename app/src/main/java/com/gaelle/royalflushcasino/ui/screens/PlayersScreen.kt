@@ -49,6 +49,7 @@ import com.gaelle.royalflushcasino.ui.theme.Gold
 import com.gaelle.royalflushcasino.ui.theme.Ivory
 import com.gaelle.royalflushcasino.viewmodel.MAX_NAME_LENGTH
 import com.gaelle.royalflushcasino.viewmodel.PlayersViewModel
+import com.gaelle.royalflushcasino.game.isRuined
 
 @Composable
 fun PlayersScreen(
@@ -158,7 +159,7 @@ private fun PlayerRow(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val broke = player.balance <= 0
+    val broke = isRuined(player.balance)
     val shape = RoundedCornerShape(12.dp)
     Surface(
         color = CasinoSurface,

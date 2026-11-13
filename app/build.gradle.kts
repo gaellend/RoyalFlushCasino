@@ -80,4 +80,6 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    // Un ViewModel par écran de la pile de navigation
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 }

@@ -7,6 +7,7 @@ import com.gaelle.royalflushcasino.data.CasinoRepository
 import com.gaelle.royalflushcasino.data.local.PlayerEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import com.gaelle.royalflushcasino.game.isRuined
 
 const val MAX_NAME_LENGTH = 15
 
@@ -45,7 +46,7 @@ class PlayersViewModel(application: Application) : AndroidViewModel(application)
     // Choisir un joueur : s'il est ruiné, il recommence avec le solde de départ
     fun selectPlayer(player: PlayerEntity, onReady: (Long) -> Unit) {
         viewModelScope.launch {
-            if (player.balance <= 0) {
+            if (isRuined(player.balance)) {
                 repository.restartPlayer(player.id)
             }
             onReady(player.id)

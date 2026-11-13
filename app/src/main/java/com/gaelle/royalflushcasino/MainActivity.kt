@@ -24,6 +24,8 @@ import com.gaelle.royalflushcasino.ui.screens.HallScreen
 import com.gaelle.royalflushcasino.ui.screens.HistoryScreen
 import com.gaelle.royalflushcasino.ui.screens.PlayersScreen
 import com.gaelle.royalflushcasino.ui.theme.RoyalFlushCasinoTheme
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,6 +55,10 @@ fun CasinoApp(windowSizeClass: WindowSizeClass) {
     ) {
         NavDisplay(
             backStack = backStack,
+            entryDecorators = listOf(
+                rememberSaveableStateHolderNavEntryDecorator(),
+                rememberViewModelStoreNavEntryDecorator()
+            ),
             entryProvider = entryProvider {
                 entry<Hall> {
                     HallScreen(
@@ -67,10 +73,14 @@ fun CasinoApp(windowSizeClass: WindowSizeClass) {
                     )
                 }
                 entry<BlackjackTable> { key ->
-                    // key.playerId : le joueur choisi (utilisé à l'étape 3)
                     BlackjackScreen(
+                        playerId = key.playerId, // le joueur choisi dans "Qui joue ?"
                         windowSizeClass = windowSizeClass,
-                        onBack = { backStack.removeLastOrNull() }
+                        onBack = { backStack.removeLastOrNull() },
+                        // Ruiné : retour au hall (on retire tous les écrans au-dessus)
+                        onRuined = {
+                            while (backStack.size > 1) backStack.removeLastOrNull()
+                        }
                     )
                 }
                 entry<History> {

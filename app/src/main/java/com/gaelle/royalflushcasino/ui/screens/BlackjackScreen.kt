@@ -26,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,6 +88,10 @@ import com.gaelle.royalflushcasino.ui.theme.Gold
 import com.gaelle.royalflushcasino.ui.theme.Ivory
 import com.gaelle.royalflushcasino.ui.theme.Montserrat
 import com.gaelle.royalflushcasino.viewmodel.BlackjackViewModel
+import kotlinx.coroutines.delay
+
+// Durée d'affichage du message de ruine avant le retour au hall
+private const val RUIN_DELAY_MS = 3500L
 
 // Toutes les valeurs dont la table a besoin pour s'afficher, regroupées en un seul objet
 private data class TableUi(
@@ -100,10 +105,12 @@ private data class TableUi(
     val bet: Int,
     val lastNet: Int?,
     val remaining: Int?,
-    val isShuffling: Boolean
+    val isShuffling: Boolean,
+    val ruined: Boolean
 ) {
     val hideDealerCard: Boolean get() = phase == GamePhase.DEALING || phase == GamePhase.PLAYER_TURN
-    val bettingTime: Boolean get() = !isBusy && (phase == GamePhase.WAITING || phase == GamePhase.FINISHED)
+    val bettingTime: Boolean
+        get() = !isBusy && !ruined && (phase == GamePhase.WAITING || phase == GamePhase.FINISHED)
     val playerTurn: Boolean get() = phase == GamePhase.PLAYER_TURN
     val currentHand: PlayerHand? get() = hands.getOrNull(activeHand)
 
@@ -115,11 +122,17 @@ private data class TableUi(
 
 @Composable
 fun BlackjackScreen(
+    playerId: Long,
     windowSizeClass: WindowSizeClass,
     onBack: () -> Unit,
+    onRuined: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val viewModel = viewModel<BlackjackViewModel>()
+    // Un ViewModel par joueur (clé), créé avec son identifiant (factory)
+    val viewModel: BlackjackViewModel = viewModel(
+        key = "blackjack-$playerId",
+        factory = BlackjackViewModel.factory(playerId)
+    )
     val hands by viewModel.hands.collectAsStateWithLifecycle()
     val activeHand by viewModel.activeHand.collectAsStateWithLifecycle()
     val dealerCards by viewModel.dealerCards.collectAsStateWithLifecycle()
@@ -131,11 +144,20 @@ fun BlackjackScreen(
     val lastNet by viewModel.lastNet.collectAsStateWithLifecycle()
     val remaining by viewModel.remaining.collectAsStateWithLifecycle()
     val isShuffling by viewModel.isShuffling.collectAsStateWithLifecycle()
+    val ruined by viewModel.ruined.collectAsStateWithLifecycle()
 
     val ui = TableUi(
         hands, activeHand, dealerCards, phase, isBusy, error,
-        balance, bet, lastNet, remaining, isShuffling
+        balance, bet, lastNet, remaining, isShuffling, ruined
     )
+
+    // Ruiné : on laisse le temps de lire le message, puis retour au hall
+    LaunchedEffect(ruined) {
+        if (ruined) {
+            delay(RUIN_DELAY_MS)
+            onRuined()
+        }
+    }
 
     // Position du sabot à l'écran : point de départ des cartes distribuées
     var shoePosition by remember { mutableStateOf<Offset?>(null) }
@@ -540,22 +562,18 @@ private fun VerticalChips(
     viewModel: BlackjackViewModel,
     modifier: Modifier = Modifier
 ) {
-    if (ui.bettingTime && ui.balance == 0 && ui.bet == 0) {
-        Button(onClick = { viewModel.refill() }, modifier = modifier) { Text("+1 000") }
-    } else {
-        Column(
-            modifier = modifier.alpha(if (ui.bettingTime) 1f else 0f),
-            verticalArrangement = Arrangement.spacedBy(8.dp), // ← écart entre les jetons
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            CHIP_VALUES.forEach { value ->
-                CasinoChip(
-                    value = value,
-                    enabled = ui.bettingTime && ui.bet + value <= ui.balance,
-                    onClick = { viewModel.addChip(value) },
-                    size = 44.dp // ← taille des jetons en paysage
-                )
-            }
+    Column(
+        modifier = modifier.alpha(if (ui.bettingTime) 1f else 0f),
+        verticalArrangement = Arrangement.spacedBy(8.dp), // ← écart entre les jetons
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CHIP_VALUES.forEach { value ->
+            CasinoChip(
+                value = value,
+                enabled = ui.bettingTime && ui.bet + value <= ui.balance,
+                onClick = { viewModel.addChip(value) },
+                size = 44.dp // ← taille des jetons en paysage
+            )
         }
     }
 }
@@ -633,7 +651,7 @@ private fun DealerHand(
     }
 }
 
-// Message au centre de la table : erreur, remélange, bannière de résultat ou inscriptions
+// Message au centre de la table : erreur, remélange, bannière de résultat (ou de ruine) ou inscriptions
 @Composable
 private fun TableMessage(
     ui: TableUi,
@@ -659,10 +677,10 @@ private fun TableMessage(
                 color = Gold
             )
             ui.phase == GamePhase.FINISHED && net != null -> {
-                val message = if (ui.hands.size == 1) {
-                    ui.hands[0].result?.message ?: ""
-                } else {
-                    ui.hands.mapIndexed { i, h -> "Main ${i + 1} : ${h.result?.short ?: ""}" }
+                val message = when {
+                    ui.ruined -> "Ruiné ! Retour au hall…"
+                    ui.hands.size == 1 -> ui.hands[0].result?.message ?: ""
+                    else -> ui.hands.mapIndexed { i, h -> "Main ${i + 1} : ${h.result?.short ?: ""}" }
                         .joinToString("  ·  ")
                 }
                 ResultBanner(
@@ -791,36 +809,28 @@ private fun SplitButton(
     }
 }
 
-// Rangée de jetons pour miser : place toujours réservée, invisibles pendant la main.
-// rowHeight : hauteur de la rangée ; les jetons sont calés en haut.
+// Rangée de jetons pour miser (portrait) : place toujours réservée, invisibles pendant la main
 @Composable
 private fun ChipsRow(
     ui: TableUi,
     viewModel: BlackjackViewModel,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
     rowHeight: Dp = 56.dp
 ) {
     Box(
         modifier = modifier.height(rowHeight),
         contentAlignment = Alignment.TopCenter
     ) {
-        if (ui.bettingTime && ui.balance == 0 && ui.bet == 0) {
-            Button(onClick = { viewModel.refill() }) {
-                Text(if (compact) "+1 000 jetons offerts" else "Plus de jetons ? Le casino vous offre 1 000")
-            }
-        } else {
-            Row(
-                modifier = Modifier.alpha(if (ui.bettingTime) 1f else 0f),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                CHIP_VALUES.forEach { value ->
-                    CasinoChip(
-                        value = value,
-                        enabled = ui.bettingTime && ui.bet + value <= ui.balance,
-                        onClick = { viewModel.addChip(value) }
-                    )
-                }
+        Row(
+            modifier = Modifier.alpha(if (ui.bettingTime) 1f else 0f),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CHIP_VALUES.forEach { value ->
+                CasinoChip(
+                    value = value,
+                    enabled = ui.bettingTime && ui.bet + value <= ui.balance,
+                    onClick = { viewModel.addChip(value) }
+                )
             }
         }
     }
