@@ -11,21 +11,21 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import com.gaelle.royalflushcasino.navigation.BlackjackTable
 import com.gaelle.royalflushcasino.navigation.Hall
-import com.gaelle.royalflushcasino.navigation.History
+import com.gaelle.royalflushcasino.navigation.Leaderboard
 import com.gaelle.royalflushcasino.navigation.Players
 import com.gaelle.royalflushcasino.ui.screens.BlackjackScreen
 import com.gaelle.royalflushcasino.ui.screens.HallScreen
-import com.gaelle.royalflushcasino.ui.screens.HistoryScreen
+import com.gaelle.royalflushcasino.ui.screens.LeaderboardScreen
 import com.gaelle.royalflushcasino.ui.screens.PlayersScreen
 import com.gaelle.royalflushcasino.ui.theme.RoyalFlushCasinoTheme
-import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
-import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             // Comme dans le cours : on récupère les classes de taille d'écran dans le setContent
+            // et on les passe aux composants
             val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
             RoyalFlushCasinoTheme {
                 CasinoApp(windowSizeClass)
@@ -55,6 +56,8 @@ fun CasinoApp(windowSizeClass: WindowSizeClass) {
     ) {
         NavDisplay(
             backStack = backStack,
+            // Chaque écran de la pile a ses propres ViewModels,
+            // créés en arrivant sur l'écran et détruits en le quittant
             entryDecorators = listOf(
                 rememberSaveableStateHolderNavEntryDecorator(),
                 rememberViewModelStoreNavEntryDecorator()
@@ -63,7 +66,7 @@ fun CasinoApp(windowSizeClass: WindowSizeClass) {
                 entry<Hall> {
                     HallScreen(
                         onBlackjack = { backStack.add(Players) }, // on choisit d'abord le joueur
-                        onHistory = { backStack.add(History) }
+                        onLeaderboard = { backStack.add(Leaderboard) }
                     )
                 }
                 entry<Players> {
@@ -83,8 +86,8 @@ fun CasinoApp(windowSizeClass: WindowSizeClass) {
                         }
                     )
                 }
-                entry<History> {
-                    HistoryScreen(onBack = { backStack.removeLastOrNull() })
+                entry<Leaderboard> {
+                    LeaderboardScreen(onBack = { backStack.removeLastOrNull() })
                 }
             }
         )

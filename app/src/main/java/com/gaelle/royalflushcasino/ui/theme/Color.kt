@@ -30,3 +30,14 @@ val ChipPurple = Color(0xFF6B3FA0)  // 500
 val ActionOrange = Color(0xFFF2A33A)   // Doubler
 
 val ActionDark = Color(0xFF262A28)     // Abandonner
+
+// Podium du classement
+val Silver = Color(0xFFC0C6CC)
+val Bronze = Color(0xFFCD7F32)
+
+// Carte du Vidéo Poker dans le hall
+val PokerRed = Color(0xFF7A1424)
+val PokerRedDark = Color(0xFF3A0A12)
+
+// Gains dans l'historique du classement
+val WinGreen = Color(0xFF4CC38A)

@@ -14,5 +14,6 @@ data object Players : NavKey
 @Serializable
 data class BlackjackTable(val playerId: Long) : NavKey
 
+// Classement des joueurs (liste/détails)
 @Serializable
-data object History : NavKey
+data object Leaderboard : NavKey

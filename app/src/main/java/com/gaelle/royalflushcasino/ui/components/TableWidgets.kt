@@ -114,35 +114,45 @@ fun TableHeader(
     }
 }
 
-// En-tête simple : flèche retour + titre (pour les écrans hors table)
+// En-tête des écrans hors table : flèche retour, titre doré centré, fin liseré dessous
 @Composable
 fun BackHeader(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                painter = painterResource(R.drawable.ic_arrow_back),
-                contentDescription = "Retour",
-                tint = Gold
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_arrow_back),
+                    contentDescription = "Retour",
+                    tint = Gold
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = Gold,
+                letterSpacing = 1.sp
             )
+            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.width(48.dp)) // équilibre la flèche pour bien centrer le titre
         }
-        Spacer(Modifier.weight(1f))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            color = Gold,
-            letterSpacing = 1.5.sp
+        HorizontalDivider(
+            modifier = Modifier.width(80.dp),
+            thickness = 1.dp,
+            color = Gold.copy(alpha = 0.5f)
         )
-        Spacer(Modifier.weight(1f))
-        Spacer(Modifier.width(48.dp))
     }
 }
 
