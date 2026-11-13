@@ -1,5 +1,9 @@
 package com.gaelle.royalflushcasino.ui.components
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -91,31 +95,45 @@ fun ChipFace(
     }
 }
 
-// Jeton cliquable pour miser
+// Jeton cliquable pour miser (taille réglable, 56 dp par défaut)
 @Composable
 fun CasinoChip(
     value: Int,
     enabled: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    size: Dp = 56.dp
 ) {
+    val haptic = LocalHapticFeedback.current
     Box(
         modifier = modifier
-            .size(56.dp)
+            .size(size)
             .alpha(if (enabled) 1f else 0.4f)
             .shadow(4.dp, CircleShape)
             .clip(CircleShape)
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(enabled = enabled) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
         contentAlignment = Alignment.Center
     ) {
-        ChipFace(color = chipColor(value), modifier = Modifier.size(56.dp))
-        Text(text = "$value", color = Ivory, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        ChipFace(color = chipColor(value), modifier = Modifier.size(size))
+        Text(
+            text = "$value",
+            color = Ivory,
+            fontWeight = FontWeight.Bold,
+            fontSize = (size.value * 0.23f).sp // texte proportionnel à la taille du jeton
+        )
     }
 }
 
-// Un jeton de la pile, qui tombe avec un petit rebond quand il apparaît
+// Un jeton de la pile, qui tombe avec un petit rebond quand il apparaît (taille réglable)
 @Composable
-private fun StackedChip(value: Int, modifier: Modifier = Modifier) {
+private fun StackedChip(
+    value: Int,
+    modifier: Modifier = Modifier,
+    chipSize: Dp = 44.dp
+) {
     val drop = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         drop.animateTo(1f, animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f))
@@ -123,40 +141,47 @@ private fun StackedChip(value: Int, modifier: Modifier = Modifier) {
     ChipFace(
         color = chipColor(value),
         modifier = modifier
-            .size(44.dp)
+            .size(chipSize)
             .graphicsLayer {
-                translationY = -40.dp.toPx() * (1f - drop.value)
+                translationY = -chipSize.toPx() * (1f - drop.value) // tombe d'une hauteur de jeton
                 alpha = drop.value.coerceIn(0f, 1f)
             }
             .shadow(2.dp, CircleShape)
     )
 }
 
-// La pile de jetons de la mise, avec le montant en dessous.
+// Pile de mise verticale (portrait), avec le montant en dessous.
 // Un appui retire le jeton du dessus (seulement entre deux mains).
 @Composable
 fun BetStack(
     amount: Int,
     onClick: () -> Unit,
     enabled: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    chipSize: Dp = 44.dp,   // taille des jetons
+    step: Dp = 5.dp         // décalage vertical entre deux jetons
 ) {
     val chips = chipsFor(amount)
     Column(
         modifier = modifier.clickable(
             enabled = enabled && amount > 0,
             interactionSource = remember { MutableInteractionSource() },
-            indication = null, // pas d'effet de surbrillance : c'est le jeton qui disparaît
+            indication = null,
             onClick = onClick
         ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Hauteur réservée pour 10 jetons : la pile ne fait pas bouger le reste en grandissant
         Box(
-            modifier = Modifier.size(width = 44.dp, height = 90.dp),
+            modifier = Modifier.size(width = chipSize, height = chipSize + step * 9),
             contentAlignment = Alignment.BottomCenter
         ) {
             chips.forEachIndexed { index, value ->
-                StackedChip(value = value, modifier = Modifier.offset(y = (-5 * index).dp))
+                StackedChip(
+                    value = value,
+                    chipSize = chipSize,
+                    modifier = Modifier.offset(y = step * (-index))
+                )
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -166,6 +191,47 @@ fun BetStack(
             color = Ivory,
             modifier = Modifier.width(64.dp),
             textAlign = TextAlign.Center
+        )
+    }
+}
+
+// Pile de mise horizontale (paysage) : les jetons se chevauchent de gauche à droite,
+// le montant est à droite de la pile. Un appui retire le dernier jeton.
+@Composable
+fun HorizontalBetStack(
+    amount: Int,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    chipSize: Dp = 30.dp,   // ← taille des jetons de la pile
+    step: Dp = 6.dp         // ← décalage entre deux jetons
+) {
+    val chips = chipsFor(amount)
+    val stackWidth = chipSize + step * (chips.size - 1).coerceAtLeast(0)
+
+    Row(
+        modifier = modifier.clickable(
+            enabled = enabled && amount > 0,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onClick
+        ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.size(width = stackWidth, height = chipSize)) {
+            chips.forEachIndexed { index, value ->
+                StackedChip(
+                    value = value,
+                    chipSize = chipSize,
+                    modifier = Modifier.offset(x = step * index)
+                )
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = if (amount > 0) formatChips(amount) else "",
+            style = MaterialTheme.typography.labelLarge,
+            color = Ivory
         )
     }
 }

@@ -29,12 +29,16 @@ import coil3.compose.AsyncImage
 import com.gaelle.royalflushcasino.R
 import com.gaelle.royalflushcasino.data.Card
 
+// Largeur d'une carte du sabot : point de départ de l'animation de distribution
+private const val SHOE_CARD_WIDTH = 50f
+
 // Une carte, face visible ou cachée, qui se retourne quand faceDown change
 @Composable
 fun PlayingCard(
     card: Card,
     modifier: Modifier = Modifier,
-    faceDown: Boolean = false
+    faceDown: Boolean = false,
+    cardWidth: Dp = 80.dp
 ) {
     val rotation by animateFloatAsState(
         targetValue = if (faceDown) 180f else 0f,
@@ -42,7 +46,7 @@ fun PlayingCard(
         label = "flip"
     )
     val cardModifier = modifier
-        .width(80.dp)
+        .width(cardWidth)
         .aspectRatio(226f / 314f)
         .graphicsLayer {
             rotationY = rotation
@@ -66,17 +70,25 @@ fun PlayingCard(
     }
 }
 
-// Une carte qui part du sabot et glisse jusqu'à sa place
+// Une carte qui part du sabot et glisse jusqu'à sa place (de travers si c'est la carte d'un doublement)
 @Composable
 private fun DealtCard(
     card: Card,
     faceDown: Boolean,
-    shoePosition: Offset?
+    shoePosition: Offset?,
+    sideways: Boolean,
+    cardWidth: Dp
 ) {
     val progress = remember { Animatable(0f) }
     var startOffset by remember { mutableStateOf<Offset?>(null) }
+    val sideAngle by animateFloatAsState(
+        targetValue = if (sideways) 90f else 0f,
+        animationSpec = tween(400),
+        label = "sideways"
+    )
+    // La carte part à la taille d'une carte du sabot, puis grandit jusqu'à sa taille normale
+    val startScale = (SHOE_CARD_WIDTH / cardWidth.value).coerceAtMost(1f)
 
-    // L'animation démarre dès qu'on connaît l'écart entre le sabot et la place de la carte
     LaunchedEffect(startOffset) {
         if (startOffset != null) {
             progress.animateTo(1f, animationSpec = tween(450, easing = FastOutSlowInEasing))
@@ -86,6 +98,7 @@ private fun DealtCard(
     PlayingCard(
         card = card,
         faceDown = faceDown,
+        cardWidth = cardWidth,
         modifier = Modifier
             .onGloballyPositioned { coords ->
                 if (startOffset == null) {
@@ -99,39 +112,45 @@ private fun DealtCard(
             .graphicsLayer {
                 val start = startOffset
                 if (start == null) {
-                    alpha = 0f // invisible tant que la position n'est pas connue
+                    alpha = 0f
                 } else {
                     val t = progress.value
                     translationX = start.x * (1f - t)
                     translationY = start.y * (1f - t)
-                    val scale = 0.62f + 0.38f * t // taille d'une carte du sabot → taille normale
+                    val scale = startScale + (1f - startScale) * t
                     scaleX = scale
                     scaleY = scale
                     transformOrigin = TransformOrigin(0f, 0f)
                 }
+            }
+            .graphicsLayer {
+                rotationZ = sideAngle
             }
     )
 }
 
 // Une main de cartes qui se chevauchent
 @Composable
-// Une main de cartes qui se chevauchent
 fun HandRow(
     cards: List<Card>,
     modifier: Modifier = Modifier,
     hideSecondCard: Boolean = false,
     shoePosition: Offset? = null,
-    overlap: Dp = (-40).dp // plus c'est négatif, plus les cartes se chevauchent
+    cardWidth: Dp = 80.dp,
+    overlap: Dp = cardWidth * -0.5f, // par défaut, les cartes se chevauchent de moitié
+    lastCardSideways: Boolean = false
 ) {
     Row(
-        modifier = modifier.height(112.dp),
+        modifier = modifier.height(cardWidth * 1.4f), // hauteur d'une carte
         horizontalArrangement = Arrangement.spacedBy(overlap)
     ) {
         cards.forEachIndexed { index, card ->
             DealtCard(
                 card = card,
                 faceDown = hideSecondCard && index == 1,
-                shoePosition = shoePosition
+                shoePosition = shoePosition,
+                sideways = lastCardSideways && index == cards.lastIndex,
+                cardWidth = cardWidth
             )
         }
     }

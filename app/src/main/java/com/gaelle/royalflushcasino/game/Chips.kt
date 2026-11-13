@@ -1,5 +1,8 @@
 package com.gaelle.royalflushcasino.game
 
+// Solde d'un nouveau joueur (et d'un joueur qui recommence après une ruine)
+const val STARTING_BALANCE = 1000
+
 // Les valeurs de jetons disponibles
 val CHIP_VALUES = listOf(10, 50, 100, 500)
 

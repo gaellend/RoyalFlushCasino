@@ -19,7 +19,13 @@ enum class GameResult(val message: String, val short: String, val payout: Double
     PUSH("Égalité", "Égalité", 1.0),
     LOSE("Le croupier gagne", "Perdu", 0.0),
     BUST("Vous dépassez 21", "Perdu", 0.0),
-    SURRENDER("Vous abandonnez la main", "Abandon", 0.5)
+    SURRENDER("Vous abandonnez la main", "Abandon", 0.5);
+
+    // La main rapporte plus que la mise
+    val isWin: Boolean get() = payout > 1.0
+
+    // La main rapporte moins que la mise
+    val isLoss: Boolean get() = payout < 1.0
 }
 
 // Une main du joueur (2 après un split)

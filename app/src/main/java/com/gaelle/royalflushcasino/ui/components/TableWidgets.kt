@@ -1,5 +1,16 @@
 package com.gaelle.royalflushcasino.ui.components
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import com.gaelle.royalflushcasino.ui.theme.Montserrat
 import androidx.compose.animation.AnimatedVisibility
@@ -135,8 +146,6 @@ fun BackHeader(
     }
 }
 
-// Bouton d'action rond avec icône et libellé (style Hit / Stand)
-// Bouton d'action rond avec une icône (ou un court texte comme "×2") et un libellé dessous
 // Bouton d'action rond avec une icône (ou un court texte comme "×2") et un libellé dessous
 @Composable
 fun ActionButton(
@@ -153,6 +162,7 @@ fun ActionButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.9f else 1f, label = "press")
+    val haptic = LocalHapticFeedback.current
 
     Column(
         modifier = modifier.alpha(if (enabled) 1f else 0.4f),
@@ -172,7 +182,10 @@ fun ActionButton(
                     interactionSource = interaction,
                     indication = LocalIndication.current,
                     enabled = enabled,
-                    onClick = onClick
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress) // petite vibration
+                        onClick()
+                    }
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -189,14 +202,13 @@ fun ActionButton(
                     color = iconTint,
                     fontFamily = Montserrat,
                     fontWeight = FontWeight.Bold,
-                    fontSize = (size.value * 0.33f).sp // ← taille du texte, proportionnelle au bouton
+                    fontSize = (size.value * 0.33f).sp
                 )
             }
         }
         Spacer(Modifier.height(6.dp))
         Text(
             text = label,
-            // Petits boutons : libellé plus petit pour tenir sur une ligne
             style = if (size < 64.dp) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
             color = Ivory,
             textAlign = TextAlign.Center
@@ -204,23 +216,40 @@ fun ActionButton(
     }
 }
 
-// Pastille blanche avec le score (invisible mais présente si "visible" est faux, pour éviter les sauts)
+// Pastille avec le score. Couleurs personnalisables (résultat), et pulsation pour une main gagnante.
+// Invisible mais présente si "visible" est faux, pour éviter les sauts de mise en page.
 @Composable
 fun ScorePill(
     text: String,
     visible: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    background: Color = Ivory,
+    textColor: Color = CasinoBlack,
+    pulse: Boolean = false
 ) {
+    val transition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(tween(500), RepeatMode.Reverse),
+        label = "pulseScale"
+    )
+
     Box(
         modifier = modifier
             .alpha(if (visible) 1f else 0f)
-            .shadow(3.dp, RoundedCornerShape(50))
+            .graphicsLayer {
+                val s = if (pulse) pulseScale else 1f
+                scaleX = s
+                scaleY = s
+            }
+            .shadow(if (pulse) 10.dp else 3.dp, RoundedCornerShape(50))
             .clip(RoundedCornerShape(50))
-            .background(Ivory)
+            .background(background)
             .padding(horizontal = 14.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, style = MaterialTheme.typography.titleMedium, color = CasinoBlack)
+        Text(text, style = MaterialTheme.typography.titleMedium, color = textColor)
     }
 }
 
@@ -247,12 +276,45 @@ fun FeltInscription(modifier: Modifier = Modifier) {
     }
 }
 
-// Bannière de fin : le gain en grand, la phrase en petit, avec un effet de zoom
+// Texte sur une seule ligne qui réduit sa taille de police tant qu'il ne rentre pas
+@Composable
+fun AutoSizeText(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    var scaledStyle by remember(text) { mutableStateOf(style) }
+    var ready by remember(text) { mutableStateOf(false) }
+
+    Text(
+        text = text,
+        style = scaledStyle,
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier.drawWithContent {
+            if (ready) drawContent() // on n'affiche qu'une fois la bonne taille trouvée
+        },
+        onTextLayout = { result ->
+            if (result.didOverflowWidth) {
+                scaledStyle = scaledStyle.copy(fontSize = scaledStyle.fontSize * 0.9f) // -10 % et on réessaie
+            } else {
+                ready = true
+            }
+        }
+    )
+}
+
+// Bannière de fin avec un effet de zoom.
+// Normale : le gain en grand, la phrase en petit dessous.
+// Compacte (paysage) : tout sur une ligne fine, pour ne pas recouvrir les pastilles de score.
 @Composable
 fun ResultBanner(
     message: String,
     net: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     val visibleState = remember { MutableTransitionState(false) }.apply { targetState = true }
 
@@ -264,40 +326,71 @@ fun ResultBanner(
         else -> Ivory
     }
     val textColor = if (lost) Ivory else CasinoBlack
-    val shape = RoundedCornerShape(16.dp)
+    val netText = when {
+        won -> "+${formatChips(net)} jetons"
+        lost -> "−${formatChips(-net)} jetons"
+        else -> "Mise remboursée"
+    }
 
     AnimatedVisibility(
         visibleState = visibleState,
         enter = scaleIn(initialScale = 0.6f) + fadeIn(),
         modifier = modifier
     ) {
-        Column(
-            modifier = Modifier
-                .shadow(8.dp, shape)
-                .clip(shape)
-                .background(background)
-                .border(1.dp, if (lost) CasinoRed else Color.Transparent, shape)
-                .padding(horizontal = 28.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = when {
-                    won -> "+${formatChips(net)} jetons"
-                    lost -> "−${formatChips(-net)} jetons"
-                    else -> "Mise remboursée"
-                },
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontFamily = Montserrat,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = textColor
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = textColor.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center
-            )
+        if (compact) {
+            val shape = RoundedCornerShape(50)
+            Row(
+                modifier = Modifier
+                    .shadow(6.dp, shape)
+                    .clip(shape)
+                    .background(background)
+                    .border(1.dp, if (lost) CasinoRed else Color.Transparent, shape)
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = netText,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = Montserrat,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = textColor,
+                    maxLines = 1
+                )
+                Text(
+                    text = "  ·  $message",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = textColor.copy(alpha = 0.8f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis // "…" si la phrase est trop longue
+                )
+            }
+        } else {
+            val shape = RoundedCornerShape(16.dp)
+            Column(
+                modifier = Modifier
+                    .shadow(8.dp, shape)
+                    .clip(shape)
+                    .background(background)
+                    .border(1.dp, if (lost) CasinoRed else Color.Transparent, shape)
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                AutoSizeText(
+                    text = netText,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = Montserrat,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = textColor
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = textColor.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
